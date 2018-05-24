@@ -78,7 +78,7 @@ def checkCrash():
     return False
 
 def printHelp():
-    print('Automatically run a command every time it crashes or any file changes')
+    print('Automatically run a command every time it exits or any file changes')
     print('usage: ' + sys.argv[0] + ' [options] command...')
     cmds = [
         ['--help,    -h,  -?', 'show this help'],
