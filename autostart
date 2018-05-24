@@ -1,0 +1,123 @@
+#! /usr/bin/python
+#
+#
+# The MIT License (MIT)
+# Copyright (c) 2018 literallyvoid
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
+###################################
+
+# Tested with python versions 2.7.15 and 3.6.5.
+
+import sys, os, time, getopt, textwrap, subprocess
+
+class Watcher:
+    def __init__(self, directories):
+        self.directories = directories
+        self.timestamps = {}
+
+    def check(self):
+        modified = []
+        for directory in self.directories:
+            for dirpath, dirnames, filenames in os.walk(directory):
+                for f in filenames:
+                    name = os.path.join(dirpath, f)
+                    try:
+                        mtime = os.path.getmtime(name)
+                    except:
+                        continue
+                    if self.timestamps.get(name, 0) != mtime:
+                        self.timestamps[name] = mtime
+                        modified.append(name)
+        return modified
+
+process = None
+    
+def runCommand(cmd):
+    global process
+    if process != None:
+        print('\x1b[00;31mKilling old process...\x1b[00m')
+        process.kill()
+        print('\x1b[01;31mdone!\x1b[00m')
+        print('\x1b[01;31m' + '=' * 50 + '\x1b[00m')
+    
+    print('\x1b[01;34m' + '=' * 50 + '\x1b[00m')
+    print('\x1b[00;36mNew process starting...\x1b[00m')
+    process = subprocess.Popen(cmd)
+    print('\x1b[01;36mdone!\x1b[00m  \x1b[00;33mPID: ' + str(process.pid) + '\x1b[00m')
+
+def checkCrash():
+    global process
+    if process == None:
+        return
+    process.poll()
+    if process.returncode != None:
+        color = '2'
+        if process.returncode != 0:
+            color = '1'
+        print('\x1b[01;3' + color + 'mCommand exited with code ' + str(process.returncode) + '\x1b[00m')
+        print('\x1b[01;3' + color + 'm' + '=' * 50 + '\x1b[00m')
+        process = None
+        return True
+    return False
+
+def printHelp():
+    print('Automatically run a command every time it crashes or any file changes')
+    print('usage: ' + sys.argv[0] + ' [options] command...')
+    cmds = [
+        ['--help,    -h,  -?', 'show this help'],
+        ['--restart, -r     ', 'automatically restart the program every time it exits instead of waiting for file changes'],
+        ['--watch=location  ', 'watch a file or directory for changes'],
+    ]
+    for cmd in cmds:
+        print('    ' + cmd[0] + '  ' + ('\n' + ' ' * (len(cmd[0]) + 8)).join(textwrap.wrap(cmd[1], 50)))
+
+if __name__ == '__main__':
+    optlist, cmd = getopt.getopt(sys.argv[1:], 'r?h', [
+        'restart', 'watch=', 'help'])
+    restart = False
+    files = []
+    watch = False
+    for o in optlist:
+        if o[0] == '-r' or o[0] == '--restart':
+            restart = True
+        elif o[0] == '--help' or o[0] == '-?' or o[0] == '-h':
+            printHelp()
+            quit()
+        elif o[0] == '--watch':
+            files.append(o[1])
+            watch = True
+    if not watch and not restart:
+        printHelp()
+        print('E: must either auto-restart or watch a file or directory')
+        quit()
+    if watch:
+        watcher = Watcher(files)
+    while True:
+        time.sleep(0.1)
+        if checkCrash() and restart:
+            runCommand(cmd)
+        if watch:
+            modified = watcher.check()
+            if len(modified):
+                if len(modified) < 6:
+                    print('\x1b[00;33mFiles changed: \x1b[01;33m' + (', '.join(modified)) + '\x1b[00m')
+                else:
+                    print('\x1b[00;33mFiles changed: \x1b[01;33m' + (', '.join(modified[:4])) + ', \x1b[00;33m' + str(len(modified) - 4) + ' unlisted files\x1b[00m')
+                runCommand(cmd)
