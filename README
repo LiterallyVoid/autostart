@@ -1,0 +1,6 @@
+Automatically run a command every time it crashes or any file changes
+usage: ./autostart [options] command...
+    --help,    -h,  -?  show this help
+    --restart, -r       automatically restart the program every time it
+                          exits instead of waiting for file changes
+    --watch=location    watch a file or directory for changes
